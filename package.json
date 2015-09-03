@@ -1,0 +1,35 @@
+{
+  "name": "gulp-paths-injector",
+  "version": "0.0.1",
+  "description": "Inject styles and scripts paths into your html automatically",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PSDCoder/gulp-injector.git"
+  },
+  "keywords": [
+    "gulpplugin ",
+    "paths",
+    "inject",
+    "injector",
+    "script",
+    "link"
+  ],
+  "author": "Pavel Grinchenko <psdcoder@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/PSDCoder/gulp-paths-injector/issues"
+  },
+  "homepage": "https://github.com/PSDCoder/gulp-paths-injector#readme",
+  "dependencies": {
+    "es6-promise-polyfill": "^1.0.0",
+    "glob": "^5.0.14",
+    "gulp-util": "^3.0.6",
+    "main-bower-files": "^2.9.0",
+    "object-assign": "^4.0.1",
+    "through2": "^2.0.0"
+  }
+}
