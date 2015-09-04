@@ -5,8 +5,8 @@ var gutil = require('gulp-util');
 var glob = require('glob');
 var os = require('os');
 var mainBowerFiles = require('main-bower-files');
-var fs = require('fs');
 var path = require('path');
+var url = require('url');
 var objectAssign = require('object-assign');
 var Promise = require('es6-promise-polyfill').Promise;
 var PluginError = gutil.PluginError;
@@ -15,6 +15,7 @@ var PLUGIN_NAME = 'gulp-injector';
 var INJECTOR_EXPRESSION = /^([^\n]*)(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/gm;
 var defaultOptions = {
     removePlaceholder: false,
+    host: null,
     templates: {
         js: '<script src="%path%"></script>',
         css: '<link rel="stylesheet" href="%path%">'
@@ -111,7 +112,7 @@ function replaceOnePlaceholder(contents, cwd, options) {
                     return path.relative(cwd, filePath);
                 });
 
-                return injectFiles(contents, files, params).then(resolve);
+                return injectFiles(contents, files, params, options).then(resolve);
             } else {
                 if (!params.globPattern) {
                     return reject(
@@ -125,7 +126,7 @@ function replaceOnePlaceholder(contents, cwd, options) {
                         return reject(new PluginError(PLUGIN_NAME, err.message));
                     }
 
-                    return injectFiles(contents, matchedFiles, params).then(resolve);
+                    return injectFiles(contents, matchedFiles, params, options).then(resolve);
                 });
             }
         } else {
@@ -137,11 +138,15 @@ function replaceOnePlaceholder(contents, cwd, options) {
     });
 }
 
-function injectFiles(contents, files, params) {
+function injectFiles(contents, files, params, options) {
     return new Promise(function (resolve, reject) {
         var indentation = os.EOL + params.indentation;
         var injectionTemplate = indentation +
             files.map(function (filename) {
+                if (options.host) {
+                    filename = url.resolve(options.host, filename);
+                }
+
                 return params.template.replace('%path%', filename);
             }).join(indentation) +
             indentation;
