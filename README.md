@@ -1,12 +1,5 @@
 Inspired by [gulp-include-source](https://github.com/gil/gulp-include-source) but this module more extensible and fully asynchronous!
 
-
-# TODO
-
-* Fix paths for bower dependencies
-* Set prefix for paths
-* Changed paths to absolute (need to think about that)
-
 # Usage
 
 ```html
