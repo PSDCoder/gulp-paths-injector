@@ -1,6 +1,6 @@
 {
   "name": "gulp-paths-injector",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Inject styles and scripts paths into your html automatically",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PSDCoder/gulp-injector.git"
+    "url": "git+https://github.com/PSDCoder/gulp-paths-injector.git"
   },
   "keywords": [
     "gulpplugin ",
