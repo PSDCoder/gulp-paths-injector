@@ -77,85 +77,92 @@ function replacePlaceholders(file, options) {
 
 function replaceOnePlaceholder(contents, cwd, options) {
     return new Promise(function (resolve, reject) {
-        var matches = INJECTOR_EXPRESSION.exec(contents);
+        try {
+            var matches = INJECTOR_EXPRESSION.exec(contents);
 
-        if (matches) {
-            var templateType = matches[3];
-            var params = {
-                name: matches[4],
-                template: null,
-                globPattern: matches[5] || null,
-                indexStart: matches.index,
-                indexInnerStart: matches.index +
-                (!options.removePlaceholder ? (matches[1].length + matches[2].length) : 0),
-                indexEnd: matches.index + matches[0].length,
-                indexInnerEnd: matches.index + matches[0].length -
-                (!options.removePlaceholder ? matches[6].length : 0),
-                indentation: new Array(matches[1].length + 1).join(' ')
-            };
+            if (matches) {
+                var templateType = matches[3];
+                var params = {
+                    name: matches[4],
+                    template: null,
+                    globPattern: matches[5] || null,
+                    indexStart: matches.index,
+                    indexInnerStart: matches.index +
+                    (!options.removePlaceholder ? (matches[1].length + matches[2].length) : 0),
+                    indexEnd: matches.index + matches[0].length,
+                    indexInnerEnd: matches.index + matches[0].length -
+                    (!options.removePlaceholder ? matches[6].length : 0),
+                    indentation: new Array(matches[1].length + 1).join(' ')
+                };
 
-            if (!options.templates[templateType]) {
-                return reject(
-                    new PluginError(PLUGIN_NAME, 'You should add template for injection type: "' + templateType + '"')
-                );
-            } else {
-                params.template = options.templates[templateType];
-            }
-
-            if (params.name === 'bower') {
-                if (params.globPattern) {
-                    return reject(new PluginError(PLUGIN_NAME, '"bower" is reserved name for auto injecting bower ' +
-                        'dependencies, so you shouldn\'t use glob pattern with it'));
+                if (!options.templates[templateType]) {
+                    return reject(new PluginError(PLUGIN_NAME, 'You should add template for injection type: "' +
+                        templateType + '"'));
+                } else {
+                    params.template = options.templates[templateType];
                 }
 
-                var files = mainBowerFiles(options.mainBowerFiles).map(function (filePath) {
-                    return path.relative(cwd, filePath);
-                });
-
-                return injectFiles(contents, files, params, options).then(resolve);
-            } else {
-                if (!params.globPattern) {
-                    return reject(
-                        new PluginError(PLUGIN_NAME, 'You should set glob pattern for including files. Passed: ' +
-                            params.globPattern)
-                    );
-                }
-
-                glob(params.globPattern, {cwd: cwd}, function (err, matchedFiles) {
-                    if (err) {
-                        return reject(new PluginError(PLUGIN_NAME, err.message));
+                if (params.name === 'bower') {
+                    if (params.globPattern) {
+                        return reject(new PluginError(PLUGIN_NAME, '"bower" is reserved name for auto injecting ' +
+                            'bower dependencies, so you shouldn\'t use glob pattern with it'));
                     }
 
-                    return injectFiles(contents, matchedFiles, params, options).then(resolve);
+                    var files = mainBowerFiles(options.mainBowerFiles).map(function (filePath) {
+                        return path.relative(cwd, filePath);
+                    });
+
+                    return injectFiles(contents, files, params, options).then(resolve);
+                } else {
+                    if (!params.globPattern) {
+                        return reject(
+                            new PluginError(PLUGIN_NAME, 'You should set glob pattern for including files. Passed: ' +
+                                params.globPattern)
+                        );
+                    }
+
+                    glob(params.globPattern, {cwd: cwd}, function (err, matchedFiles) {
+                        if (err) {
+                            return reject(new PluginError(PLUGIN_NAME, err.message));
+                        }
+
+                        return injectFiles(contents, matchedFiles, params, options).then(resolve);
+                    });
+                }
+            } else {
+                resolve({
+                    value: contents,
+                    done: true
                 });
             }
-        } else {
-            resolve({
-                value: contents,
-                done: true
-            });
+        } catch (e) {
+            return reject(new PluginError(PLUGIN_NAME, e.message));
         }
     });
 }
 
 function injectFiles(contents, files, params, options) {
     return new Promise(function (resolve, reject) {
-        var indentation = os.EOL + params.indentation;
-        var injectionTemplate = indentation +
-            files.map(function (filename) {
-                if (options.host) {
-                    filename = url.resolve(options.host, filename);
-                }
+        try {
+            var indentation = os.EOL + params.indentation;
+            var injectionTemplate = indentation +
+                files.map(function (filename) {
+                    if (options.host) {
+                        filename = url.resolve(options.host, filename);
+                    }
 
-                return params.template.replace('%path%', filename);
-            }).join(indentation) +
-            indentation;
+                    return params.template.replace('%path%', filename);
+                }).join(indentation) +
+                indentation;
 
-        return resolve({
-            value: contents.substring(0, params.indexInnerStart) + injectionTemplate +
-            contents.substring(params.indexInnerEnd),
-            done: false
-        });
+            return resolve({
+                value: contents.substring(0, params.indexInnerStart) + injectionTemplate +
+                contents.substring(params.indexInnerEnd),
+                done: false
+            });
+        } catch (e) {
+            return reject(new PluginError(PLUGIN_NAME, e.message));
+        }
     });
 }
 
