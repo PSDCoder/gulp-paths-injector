@@ -43,17 +43,19 @@ this template may be handled with this gulp config:
     var injector = gulpInjector({
         cwd: 'some/path', //by default dirname of file
         removePlaceholder: false, //by default false
+        host: null, // you can set host and paths will be prefixed with it
         templates: {
             js: '<script src="%path%"></script>',
             css: '<link rel="stylesheet" href="%path%">'
-        }
+        },
+        mainBowerFiles: {} // config for main-bower-files plugin
     });
        
     gulp.task('inject', function () {
         gulp.src('index.html')
             .pipe(plumber())
             .pipe(injector.inject())
-            .pipe(gulp.dest('./index-njected.html'));
+            .pipe(gulp.dest('./index-injected.html'));
     });
 ```
 

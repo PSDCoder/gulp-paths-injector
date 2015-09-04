@@ -88,10 +88,10 @@ function replaceOnePlaceholder(contents, cwd, options) {
                     globPattern: matches[5] || null,
                     indexStart: matches.index,
                     indexInnerStart: matches.index +
-                    (!options.removePlaceholder ? (matches[1].length + matches[2].length) : 0),
+                        (!options.removePlaceholder ? (matches[1].length + matches[2].length) : 0),
                     indexEnd: matches.index + matches[0].length,
                     indexInnerEnd: matches.index + matches[0].length -
-                    (!options.removePlaceholder ? matches[6].length : 0),
+                        (!options.removePlaceholder ? matches[6].length : 0),
                     indentation: new Array(matches[1].length + 1).join(' ')
                 };
 
@@ -157,7 +157,7 @@ function injectFiles(contents, files, params, options) {
 
             return resolve({
                 value: contents.substring(0, params.indexInnerStart) + injectionTemplate +
-                contents.substring(params.indexInnerEnd),
+                    contents.substring(params.indexInnerEnd),
                 done: false
             });
         } catch (e) {
