@@ -31,23 +31,22 @@ this template may be handled with this gulp config:
 
 
 ```js
-    var gulpInjector = require('gulp-injector');
+    var injector = require('gulp-injector');
     var plumber = require('gulp-plumber');
-    var injector = gulpInjector({
-        cwd: 'some/path', //by default dirname of file
-        removePlaceholder: false, //by default false
-        host: null, // you can set host and paths will be prefixed with it
-        templates: {
-            js: '<script src="%path%"></script>',
-            css: '<link rel="stylesheet" href="%path%">'
-        },
-        mainBowerFiles: {} // config for main-bower-files plugin
-    });
        
     gulp.task('inject', function () {
         gulp.src('index.html')
             .pipe(plumber())
-            .pipe(injector.inject())
+            .pipe(injector({
+                cwd: 'some/path', //by default dirname of file
+                removePlaceholder: false, //by default false
+                host: null, // you can set host and paths will be prefixed with it
+                templates: {
+                  js: '<script src="%path%"></script>',
+                  css: '<link rel="stylesheet" href="%path%">'
+                },
+                mainBowerFiles: {} // config for main-bower-files plugin
+            }))
             .pipe(gulp.dest('./index-injected.html'));
     });
 ```
