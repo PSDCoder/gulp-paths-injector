@@ -23,13 +23,7 @@ var defaultOptions = {
     mainBowerFiles: {}
 };
 
-module.exports = gulpInjector;
-
-function gulpInjector(options) {
-    return {
-        inject: inject.bind(null, options)
-    };
-}
+module.exports = inject
 
 function inject(options) {
     options = objectAssign({}, defaultOptions, options) || {};

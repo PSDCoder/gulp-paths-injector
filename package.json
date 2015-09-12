@@ -1,6 +1,6 @@
 {
   "name": "gulp-paths-injector",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Inject styles and scripts paths into your html automatically",
   "main": "index.js",
   "scripts": {
