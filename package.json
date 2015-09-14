@@ -16,6 +16,8 @@
     "paths",
     "inject",
     "injector",
+    "include",
+    "glob",
     "script",
     "link"
   ],
