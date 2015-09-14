@@ -88,7 +88,7 @@ and in index-injected.html you can find injected dependencies paths:
 ### options.cwd
 
 Type: `String`  
-Default: `process.cwd`
+Default: `gulp.src(file)`
 
 Base directory from where the plugin will search for source files.
 
