@@ -12,7 +12,7 @@ var Promise = require('es6-promise-polyfill').Promise;
 var PluginError = gutil.PluginError;
 
 var PLUGIN_NAME = 'gulp-injector';
-var INJECTOR_EXPRESSION = /^([^\n]*)(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/m;
+var INJECTOR_EXPRESSION = /^([^\n]*)(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/gm;
 var defaultOptions = {
     removePlaceholder: false,
     host: null,
@@ -55,6 +55,9 @@ function inject(options) {
 }
 
 function replacePlaceholders(file, options) {
+    //reset regex state
+    INJECTOR_EXPRESSION.lastIndex = 0;
+
     var cwd = options.cwd || path.dirname(file.path);
 
     function onResolved(result) {
@@ -74,23 +77,16 @@ function replaceOnePlaceholder(contents, cwd, options) {
         try {
             var matches = INJECTOR_EXPRESSION.exec(contents);
 
-            console.log(matches);
-            console.log(contents.match(INJECTOR_EXPRESSION));
-
             if (matches) {
                 var templateType = matches[3];
-
-                //@todo fix calculating of indexes when removePlaceholder === true, maybe it's about regex state
                 var params = {
                     name: matches[4],
                     template: null,
                     globPattern: matches[5] || null,
                     indexStart: matches.index,
-                    indexInnerStart: matches.index +
-                        (!options.removePlaceholder ? (matches[1].length + matches[2].length) : 0),
+                    injectStartComment: matches[2],
                     indexEnd: matches.index + matches[0].length,
-                    indexInnerEnd: matches.index + matches[0].length -
-                        (!options.removePlaceholder ? matches[6].length : 0),
+                    injectEndComment: matches[6],
                     indentation: new Array(matches[1].length + 1).join(' ')
                 };
 
@@ -102,8 +98,6 @@ function replaceOnePlaceholder(contents, cwd, options) {
                 }
 
                 if (params.name === 'bower') {
-                    //@todo fix caching of calling mainBowerFiles
-
                     if (params.globPattern) {
                         return reject(new PluginError(PLUGIN_NAME, '"bower" is reserved name for auto injecting ' +
                             'bower dependencies, so you shouldn\'t use glob pattern with it'));
@@ -145,20 +139,29 @@ function replaceOnePlaceholder(contents, cwd, options) {
 function injectFiles(contents, files, params, options) {
     return new Promise(function (resolve, reject) {
         try {
+            var injectionTemplate = '';
             var indentation = os.EOL + params.indentation;
-            var injectionTemplate = indentation +
-                files.map(function (filename) {
-                    if (options.host) {
-                        filename = url.resolve(options.host, filename);
-                    }
 
-                    return params.template.replace('%path%', filename);
-                }).join(indentation) +
-                indentation;
+            if (!options.removePlaceholder)            {
+                injectionTemplate += params.injectStartComment + indentation;
+            }
+
+            injectionTemplate += files.map(function (filename) {
+                if (options.host) {
+                    filename = url.resolve(options.host, filename);
+                }
+
+                return params.template.replace('%path%', filename);
+            }).join(indentation) + indentation;
+
+            if (!options.removePlaceholder) {
+                injectionTemplate += params.injectEndComment;
+            }
+
+            INJECTOR_EXPRESSION.lastIndex = params.indexStart + injectionTemplate.length;
 
             return resolve({
-                value: contents.substring(0, params.indexInnerStart) + injectionTemplate +
-                    contents.substring(params.indexInnerEnd),
+                value: contents.slice(0, params.indexStart) + injectionTemplate + contents.slice(params.indexEnd),
                 done: false
             });
         } catch (e) {
