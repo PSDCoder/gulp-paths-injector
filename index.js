@@ -12,7 +12,7 @@ var Promise = require('es6-promise-polyfill').Promise;
 var PluginError = gutil.PluginError;
 
 var PLUGIN_NAME = 'gulp-injector';
-var INJECTOR_EXPRESSION = /^([^\n]*)(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/gm;
+var INJECTOR_EXPRESSION = /^([^\n]*)(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/m;
 var defaultOptions = {
     removePlaceholder: false,
     host: null,
@@ -23,7 +23,7 @@ var defaultOptions = {
     mainBowerFiles: {}
 };
 
-module.exports = inject
+module.exports = inject;
 
 function inject(options) {
     options = objectAssign({}, defaultOptions, options) || {};
@@ -74,8 +74,13 @@ function replaceOnePlaceholder(contents, cwd, options) {
         try {
             var matches = INJECTOR_EXPRESSION.exec(contents);
 
+            console.log(matches);
+            console.log(contents.match(INJECTOR_EXPRESSION));
+
             if (matches) {
                 var templateType = matches[3];
+
+                //@todo fix calculating of indexes when removePlaceholder === true, maybe it's about regex state
                 var params = {
                     name: matches[4],
                     template: null,
@@ -97,6 +102,8 @@ function replaceOnePlaceholder(contents, cwd, options) {
                 }
 
                 if (params.name === 'bower') {
+                    //@todo fix caching of calling mainBowerFiles
+
                     if (params.globPattern) {
                         return reject(new PluginError(PLUGIN_NAME, '"bower" is reserved name for auto injecting ' +
                             'bower dependencies, so you shouldn\'t use glob pattern with it'));
@@ -115,7 +122,7 @@ function replaceOnePlaceholder(contents, cwd, options) {
                         );
                     }
 
-                    glob(params.globPattern, {cwd: cwd}, function (err, matchedFiles) {
+                    glob(params.globPattern, { cwd: cwd }, function (err, matchedFiles) {
                         if (err) {
                             return reject(new PluginError(PLUGIN_NAME, err.message));
                         }

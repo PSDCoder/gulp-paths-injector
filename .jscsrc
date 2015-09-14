@@ -11,10 +11,15 @@
   },
   "disallowSpacesInAnonymousFunctionExpression": null,
   "disallowSpacesInFunctionExpression": null,
+  "disallowMultipleLineBreaks": false,
   "requireSpacesInAnonymousFunctionExpression": {
     "beforeOpeningRoundBrace": true
   },
   "requireSpacesInFunctionExpression": {
     "beforeOpeningRoundBrace": true
+  },
+  "disallowSpacesInsideObjectBrackets": null,
+  "requireSpacesInsideObjectBrackets": {
+    "allExcept": [ "}", ")" ]
   }
 }
