@@ -1,4 +1,7 @@
-Gulp plugin for including paths to scripts, bower scripts and styles by passed glob into HTML automatically.
+[![Build Status](https://travis-ci.org/PSDCoder/gulp-paths-injector.svg?branch=v0.1.2)](https://travis-ci.org/PSDCoder/gulp-paths-injector)
+[![npm version](https://badge.fury.io/js/gulp-paths-injector.svg)](http://badge.fury.io/js/gulp-paths-injector)
+
+Gulp plugin for including paths to scripts, bower scripts and styles by passed glob into HTML automatically.  
 Inspired by [gulp-include-source](https://github.com/gil/gulp-include-source), but this module more extensible and asynchronous (except bower injecting - it's doing by main-bower-files plugin. Maybe you want do this asynchronous too? Create pull request for it)!
 
 # Install
@@ -20,7 +23,8 @@ npm install gulp-paths-injector --save-dev
         <!-- endinject -->
     </head>
     <body>
-        <!-- inject:js:bower --> //with bower you don't need use glob
+        <!-- with bower you don't need use glob -->
+        <!-- inject:js:bower -->
     
         <!-- endinject -->
     
