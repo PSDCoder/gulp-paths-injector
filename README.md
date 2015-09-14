@@ -42,13 +42,15 @@ this template may be handled with this gulp config:
 
 
 ```js
-    var injector = require('gulp-paths-injector');
+    var pathsInjector = require('gulp-paths-injector');
     var plumber = require('gulp-plumber');
        
     gulp.task('inject', function () {
+        var injector = pathsInjector({ host: 'http://somecdn.net' });
+
         gulp.src('index.html')
             .pipe(plumber())
-            .pipe(injector())
+            .pipe(injector.inject())
             .pipe(gulp.dest('./index-injected.html'));
     });
 ```
@@ -126,6 +128,11 @@ Default: `{}`
 
 If you want pass custom options to main-bower-files plugin you can use this option.
 
+## injector.inject()
+
+Type: `Stream`
+
+Resolve all injections in passed template and return handled template.
 
 # Contributing
 
