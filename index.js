@@ -11,8 +11,8 @@ var objectAssign = require('object-assign');
 var Promise = require('es6-promise-polyfill').Promise;
 var PluginError = gutil.PluginError;
 
-var PLUGIN_NAME = 'gulp-injector';
-var INJECTOR_EXPRESSION = /^([^\n]*)(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/gm;
+var PLUGIN_NAME = 'gulp-paths-injector';
+var INJECTOR_EXPRESSION = /(^[ \t]*){0,1}(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/m;
 var defaultOptions = {
     removePlaceholder: false,
     host: null,
@@ -23,11 +23,15 @@ var defaultOptions = {
     mainBowerFiles: {}
 };
 
-module.exports = inject;
-
-function inject(options) {
+module.exports = function (options) {
     options = objectAssign({}, defaultOptions, options) || {};
 
+    return {
+        inject: injectStream.bind(null, options)
+    };
+};
+
+function injectStream(options) {
     return through.obj(function (file, enc, cb) {
         var self = this;
 
@@ -41,9 +45,14 @@ function inject(options) {
         }
 
         if (file.isBuffer()) {
-            replacePlaceholders(file, options)
+            var contents = file.contents.toString();
+            options.cwd = options.cwd || file.base;
+
+            extractPlaceholders(contents)
+                .then(resolveGlobs.bind(null, options))
+                .then(injectFiles.bind(null, contents, options))
                 .then(function (contents) {
-                    file.contents = contents;
+                    file.contents = new Buffer(contents);
                     cb(null, file);
                 },
                 function (err) {
@@ -54,119 +63,142 @@ function inject(options) {
     });
 }
 
-function replacePlaceholders(file, options) {
-    //reset regex state
-    INJECTOR_EXPRESSION.lastIndex = 0;
-
-    var cwd = options.cwd || path.dirname(file.path);
+function extractPlaceholders(contents) {
+    var placeholdersParams = [];
 
     function onResolved(result) {
-        if (result.done) {
-            return new Buffer(result.value);
+        if (result) {
+            placeholdersParams.push(result.params);
+            return extractPlaceholder(result.contents, result.nextIndexStart).then(onResolved);
         } else {
-            return replaceOnePlaceholder(result.value, cwd, options).then(onResolved);
+            return placeholdersParams;
         }
     }
 
-    return replaceOnePlaceholder(file.contents.toString(), cwd, options)
-        .then(onResolved);
+    return extractPlaceholder(contents).then(onResolved);
 }
 
-function replaceOnePlaceholder(contents, cwd, options) {
+function extractPlaceholder(contents, indexStart) {
+    indexStart = indexStart || 0;
+
     return new Promise(function (resolve, reject) {
         try {
-            var matches = INJECTOR_EXPRESSION.exec(contents);
+            var matches = contents.slice(indexStart).match(INJECTOR_EXPRESSION);
 
             if (matches) {
-                var templateType = matches[3];
                 var params = {
                     name: matches[4],
-                    template: null,
-                    globPattern: matches[5] || null,
-                    indexStart: matches.index,
+                    templateType: matches[3],
+                    glob: matches[5] || null,
+                    indexStart: indexStart + matches.index,
+                    indexEnd: indexStart + matches.index + matches[0].length,
                     injectStartComment: matches[2],
-                    indexEnd: matches.index + matches[0].length,
                     injectEndComment: matches[6],
-                    indentation: new Array(matches[1].length + 1).join(' ')
+                    indentation: matches[1] ? new Array(matches[1].length + 1).join(' ') : ''
                 };
 
-                if (!options.templates[templateType]) {
-                    return reject(new PluginError(PLUGIN_NAME, 'You should add template for injection type: "' +
-                        templateType + '"'));
-                } else {
-                    params.template = options.templates[templateType];
-                }
+                return resolve({
+                    params: params,
+                    contents: contents,
+                    nextIndexStart: indexStart + matches[0].length
+                });
+            }
 
-                if (params.name === 'bower') {
-                    if (params.globPattern) {
+            return resolve(null);
+        } catch (e) {
+            return reject(new PluginError(PLUGIN_NAME, e.message));
+        }
+    });
+}
+
+function resolveGlobs(options, placeholdersParams) {
+    return Promise.all(placeholdersParams.map(function (placeholderParams) {
+        return new Promise(function (resolve, reject) {
+            try {
+                if (placeholderParams.name === 'bower') {
+                    if (placeholderParams.glob) {
                         return reject(new PluginError(PLUGIN_NAME, '"bower" is reserved name for auto injecting ' +
                             'bower dependencies, so you shouldn\'t use glob pattern with it'));
                     }
 
-                    var files = mainBowerFiles(options.mainBowerFiles).map(function (filePath) {
-                        return path.relative(cwd, filePath);
+                    placeholderParams.files = mainBowerFiles(options.mainBowerFiles).map(function (filePath) {
+                        return path.relative(options.cwd, filePath);
                     });
 
-                    return injectFiles(contents, files, params, options).then(resolve);
+                    return resolve(placeholderParams);
                 } else {
-                    if (!params.globPattern) {
+                    if (!placeholderParams.glob) {
                         return reject(
                             new PluginError(PLUGIN_NAME, 'You should set glob pattern for including files. Passed: ' +
-                                params.globPattern)
+                                placeholderParams.glob)
                         );
                     }
 
-                    glob(params.globPattern, { cwd: cwd }, function (err, matchedFiles) {
+                    glob(placeholderParams.glob, { cwd: options.cwd }, function (err, files) {
                         if (err) {
                             return reject(new PluginError(PLUGIN_NAME, err.message));
                         }
 
-                        return injectFiles(contents, matchedFiles, params, options).then(resolve);
+                        placeholderParams.files = files;
+
+                        return resolve(placeholderParams);
                     });
                 }
-            } else {
-                resolve({
-                    value: contents,
-                    done: true
-                });
+            } catch (e) {
+                return reject(new PluginError(PLUGIN_NAME, e.message));
             }
-        } catch (e) {
-            return reject(new PluginError(PLUGIN_NAME, e.message));
-        }
-    });
+        });
+    }));
 }
 
-function injectFiles(contents, files, params, options) {
+function injectFiles(contents, options, placeholdersParams) {
     return new Promise(function (resolve, reject) {
         try {
-            var injectionTemplate = '';
-            var indentation = os.EOL + params.indentation;
+            var offset = 0;
+            var params;
+            var replacement;
 
-            if (!options.removePlaceholder)            {
-                injectionTemplate += params.injectStartComment + indentation;
-            }
-
-            injectionTemplate += files.map(function (filename) {
-                if (options.host) {
-                    filename = url.resolve(options.host, filename);
+            for (var i = 0, ii = placeholdersParams.length; i < ii; i++) {
+                params = placeholdersParams[i];
+                if (!options.templates[params.templateType]) {
+                    return reject(new PluginError(PLUGIN_NAME, 'You should add template for injection type: "' +
+                        params.templateType + '"'));
                 }
 
-                return params.template.replace('%path%', filename);
-            }).join(indentation) + indentation;
-
-            if (!options.removePlaceholder) {
-                injectionTemplate += params.injectEndComment;
+                replacement = buildTemplate(params, options);
+                params.indexStart += offset;
+                params.indexEnd += offset;
+                contents = contents.slice(0, params.indexStart) + replacement + contents.slice(params.indexEnd);
+                offset += replacement.length - (params.indexEnd - params.indexStart);
             }
 
-            INJECTOR_EXPRESSION.lastIndex = params.indexStart + injectionTemplate.length;
-
-            return resolve({
-                value: contents.slice(0, params.indexStart) + injectionTemplate + contents.slice(params.indexEnd),
-                done: false
-            });
+            return resolve(contents);
         } catch (e) {
             return reject(new PluginError(PLUGIN_NAME, e.message));
         }
     });
 }
 
+function buildTemplate(placeholderParams, options) {
+    var template = options.templates[placeholderParams.templateType];
+    var replacement = '';
+    var indentation = os.EOL + placeholderParams.indentation;
+
+    if (!options.removePlaceholder)            {
+        replacement += placeholderParams.injectStartComment + indentation;
+    }
+
+    replacement += placeholderParams.files.map(function (filename) {
+            if (options.host) {
+                filename = url.resolve(options.host, filename);
+            }
+
+            return template.replace('%path%', filename);
+        }).join(indentation) + indentation;
+
+    if (!options.removePlaceholder) {
+        replacement += placeholderParams.injectEndComment;
+    }
+
+    return replacement;
+}
