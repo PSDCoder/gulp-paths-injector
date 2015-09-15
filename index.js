@@ -3,6 +3,7 @@
 var through = require('through2');
 var gutil = require('gulp-util');
 var glob = require('glob');
+var vinylFs = require('vinyl-fs');
 var os = require('os');
 var mainBowerFiles = require('main-bower-files');
 var path = require('path');
@@ -27,7 +28,8 @@ module.exports = function (options) {
     options = objectAssign({}, defaultOptions, options) || {};
 
     return {
-        inject: injectStream.bind(null, options)
+        inject: injectStream.bind(null, options),
+        src: srcStream.bind(null, options)
     };
 };
 
@@ -63,13 +65,55 @@ function injectStream(options) {
     });
 }
 
+function srcStream(options, templateType, name) {
+    return through.obj(function (file, enc, cb) {
+        var self = this;
+
+        if (file.isNull()) {
+            return cb(null, file);
+        }
+
+        if (file.isStream()) {
+            self.emit('error', new PluginError(PLUGIN_NAME, 'Streams not supported'));
+            return cb();
+        }
+
+        if (file.isBuffer()) {
+            var contents = file.contents.toString();
+            options.cwd = options.cwd || file.base;
+
+            extractPlaceholders(contents)
+                .then(resolveGlobs.bind(null, options))
+                .then(filterPlaceholders.bind(null, templateType, name))
+                .then(mergeGlobsFromParams)
+                .then(function (mergedGlobs) {
+                    var filesStream = vinylFs.src(mergedGlobs, { base: file.base });
+
+                    filesStream
+                        .pipe(through.obj(function (newFile, enc, filesStreamCb) {
+                            self.push(newFile);
+                            filesStreamCb();
+                        }))
+                        .on('finish', function () {
+                            self.emit('end');
+                            cb();
+                        });
+                },
+                function (err) {
+                    self.emit('error', err);
+                    return cb();
+                });
+        }
+    });
+}
+
 function extractPlaceholders(contents) {
     var placeholdersParams = [];
 
     function onResolved(result) {
         if (result) {
             placeholdersParams.push(result.params);
-            return extractPlaceholder(result.contents, result.nextIndexStart).then(onResolved);
+            return extractPlaceholder(contents, result.nextIndexStart).then(onResolved);
         } else {
             return placeholdersParams;
         }
@@ -99,8 +143,7 @@ function extractPlaceholder(contents, indexStart) {
 
                 return resolve({
                     params: params,
-                    contents: contents,
-                    nextIndexStart: indexStart + matches[0].length
+                    nextIndexStart: params.indexEnd
                 });
             }
 
@@ -185,7 +228,7 @@ function buildTemplate(placeholderParams, options) {
     var indentation = os.EOL + placeholderParams.indentation;
 
     if (!options.removePlaceholder)            {
-        replacement += placeholderParams.injectStartComment + indentation;
+        replacement += placeholderParams.indentation + placeholderParams.injectStartComment + indentation;
     }
 
     replacement += placeholderParams.files.map(function (filename) {
@@ -201,4 +244,42 @@ function buildTemplate(placeholderParams, options) {
     }
 
     return replacement;
+}
+
+function filterPlaceholders(templateType, name, placeholdersParams) {
+    return new Promise(function (resolve, reject) {
+        try {
+            return resolve(placeholdersParams.filter(function (placeholderParams) {
+                var result = true;
+
+                if (!templateType) {
+                    return reject(new PluginError(PLUGIN_NAME, '"templateType" is mandatory parameter'));
+                }
+
+                if (placeholderParams.templateType !== templateType) {
+                    result = false;
+                }
+
+                if (name && placeholderParams.name !== name) {
+                    result = false;
+                }
+
+                return result;
+            }));
+        } catch (e) {
+            return reject(new PluginError(PLUGIN_NAME, e.message));
+        }
+    });
+}
+
+function mergeGlobsFromParams(placeholdersParams) {
+    return new Promise(function (resolve, reject) {
+        try {
+            return resolve(placeholdersParams.reduce(function (result, placeholderParams) {
+                return result.concat(placeholderParams.files);
+            }, []));
+        } catch (e) {
+            return reject(new PluginError(PLUGIN_NAME, e.message));
+        }
+    });
 }

@@ -5,10 +5,12 @@
 var expect = require('chai').expect;
 var mockery = require('mockery');
 var sinon = require('sinon');
+var fs = require('fs');
+var path = require('path');
 var File = require('vinyl');
 var stream = require('stream');
+var eventStream = require('event-stream');
 
-//@todo use template type without settings template to options - error
 //@todo save indentation
 
 describe('gulp-paths-injector', function () {
@@ -28,17 +30,31 @@ describe('gulp-paths-injector', function () {
                 'files/file2' + extension
             ]);
         });
+        mockery.registerMock('vinyl-fs', {
+            src: function () {
+                return eventStream.readArray([
+                    new File({
+                        path: 'files/file1.js',
+                        contents: new Buffer('data1')
+                    }),
+                    new File({
+                        path: 'files/file2.js',
+                        contents: new Buffer('data2')
+                    })
+                ]);
+            }
+        });
 
         var mainBowerFilesMock = function () {
             return [
-                '../../bower_components/jquery/jquery.js',
-                '../../bower_components/lodash/lodash.js'
+                '../bower_components/jquery/jquery.js',
+                '../bower_components/lodash/lodash.js'
             ];
         };
 
         mainBowerFilesSpy = sinon.spy(mainBowerFilesMock);
         mockery.registerMock('main-bower-files', mainBowerFilesSpy);
-        pathsInjector = require('./index');
+        pathsInjector = require('./../index');
     });
 
     after(function () {
@@ -58,7 +74,7 @@ describe('gulp-paths-injector', function () {
                 handleExceptions(function () {
                     expect(errorSpy.calledOnce).to.be.true;
                     expect(errorSpy.calledWithMatch({ message: 'Streams not supported' })).to.be.true;
-                }, done);
+                }, done, done);
             });
             injectorStream.write(fakeFile);
             injectorStream.end();
@@ -77,40 +93,75 @@ describe('gulp-paths-injector', function () {
                         '<script src="files/file2.js"></script>',
                         '<!-- endinject -->'
                     ].join('\n'));
-                }, done);
+                }, done, done);
             });
             injectorStream.write(fakeFile);
             injectorStream.end();
         });
 
-        it('Multiple inlined injects', function (done) {
+        it('Handle complex template', function (done) {
             var injector = pathsInjector();
             var injectorStream = injector.inject();
-            var fakeFile = new File({
-                contents: new Buffer(
-                    'hello <!-- inject:js:test (**/*.js) -->\n<!-- endinject -->\n' +
-                    'some test custom text\n' +
-                    '<!-- inject:css:test (**/*.css) -->\n<!-- endinject -->'
-                )
-            });
+            var fakeFile = new File({ contents: fs.readFileSync(path.join(__dirname, './fixtures/complex.html')) });
+            var templateResult = fs.readFileSync(path.join(__dirname, './fixtures/complex-injected.html'), 'utf8');
 
             injectorStream.once('data', function (file) {
                 handleExceptions(function () {
-                    expect(file.contents.toString('utf8')).to.equal([
-                        'hello <!-- inject:js:test (**/*.js) -->',
-                        '<script src="files/file1.js"></script>',
-                        '<script src="files/file2.js"></script>',
-                        '<!-- endinject -->',
-                        'some test custom text',
-                        '<!-- inject:css:test (**/*.css) -->',
-                        '<link rel="stylesheet" href="files/file1.css">',
-                        '<link rel="stylesheet" href="files/file2.css">',
-                        '<!-- endinject -->'
-                    ].join('\n'));
-                }, done);
+                    expect(file.contents.toString('utf8')).to.equal(templateResult);
+                }, done, done);
             });
             injectorStream.write(fakeFile);
             injectorStream.end();
+        });
+
+        describe('Correct indentation', function () {
+            it('Inlined', function (done) {
+                var injector = pathsInjector();
+                var injectorStream = injector.inject();
+                var fakeFile = new File({
+                    contents: new Buffer(
+                        'hello <!-- inject:js:test (**/*.js) -->\n<!-- endinject -->some test custom text'
+                    )
+                });
+
+                injectorStream.once('data', function (file) {
+                    handleExceptions(function () {
+                        expect(file.contents.toString('utf8')).to.equal([
+                            'hello <!-- inject:js:test (**/*.js) -->',
+                            '<script src="files/file1.js"></script>',
+                            '<script src="files/file2.js"></script>',
+                            '<!-- endinject -->some test custom text'
+                        ].join('\n'));
+                    }, done, done);
+                });
+                injectorStream.write(fakeFile);
+                injectorStream.end();
+            });
+
+            it('Own line', function (done) {
+                var injector = pathsInjector();
+                var injectorStream = injector.inject();
+                var fakeFile = new File({
+                    contents: new Buffer(
+                        'hello\n    <!-- inject:js:test (**/*.js) -->\n    <!-- endinject -->\nsome test custom text'
+                    )
+                });
+
+                injectorStream.once('data', function (file) {
+                    handleExceptions(function () {
+                        expect(file.contents.toString('utf8')).to.equal([
+                            'hello',
+                            '    <!-- inject:js:test (**/*.js) -->',
+                            '    <script src="files/file1.js"></script>',
+                            '    <script src="files/file2.js"></script>',
+                            '    <!-- endinject -->',
+                            'some test custom text'
+                        ].join('\n'));
+                    }, done, done);
+                });
+                injectorStream.write(fakeFile);
+                injectorStream.end();
+            });
         });
 
         it('Correct template selection - css', function (done) {
@@ -126,7 +177,7 @@ describe('gulp-paths-injector', function () {
                         '<link rel="stylesheet" href="files/file2.css">',
                         '<!-- endinject -->'
                     ].join('\n'));
-                }, done);
+                }, done, done);
             });
             injectorStream.write(fakeFile);
             injectorStream.end();
@@ -144,7 +195,7 @@ describe('gulp-paths-injector', function () {
                             '<script src="files/file1.js"></script>\n<script src="files/file2.js"></script>\n'
                         );
 
-                    }, done);
+                    }, done, done);
                 });
                 injectorStream.write(fakeFile);
                 injectorStream.end();
@@ -165,7 +216,7 @@ describe('gulp-paths-injector', function () {
                             '<script src="' + host + 'files/file2.js"></script>',
                             '<!-- endinject -->'
                         ].join('\n'));
-                    }, done);
+                    }, done, done);
                 });
                 injectorStream.write(fakeFile);
                 injectorStream.end();
@@ -189,7 +240,7 @@ describe('gulp-paths-injector', function () {
                                 '<script  type="javascript" src="files/file2.js" defer></script>',
                                 '<!-- endinject -->'
                             ].join('\n'));
-                        }, done);
+                        }, done, done);
                     });
                     injectorStream.write(fakeFile);
                     injectorStream.end();
@@ -212,7 +263,7 @@ describe('gulp-paths-injector', function () {
                                 '<link href="files/file2.css" />',
                                 '<!-- endinject -->'
                             ].join('\n'));
-                        }, done);
+                        }, done, done);
                     });
                     injectorStream.write(fakeFile);
                     injectorStream.end();
@@ -234,7 +285,7 @@ describe('gulp-paths-injector', function () {
                             expect(errorSpy.calledWithMatch({
                                 message: 'You should add template for injection type: "xml"'
                             })).to.be.true;
-                        }, done);
+                        }, done, done);
                     });
                     injectorStream.write(fakeFile);
                     injectorStream.end();
@@ -259,7 +310,7 @@ describe('gulp-paths-injector', function () {
                                 '<script type="text/jsx" src="files/file2.jsx"></script>',
                                 '<!-- endinject -->'
                             ].join('\n'));
-                        }, done);
+                        }, done, done);
                     });
                     injectorStream.write(fakeFile);
                     injectorStream.end();
@@ -276,11 +327,11 @@ describe('gulp-paths-injector', function () {
                         handleExceptions(function () {
                             expect(file.contents.toString('utf8')).to.equal([
                                 '<!-- inject:js:bower -->',
-                                '<script src="../../bower_components/jquery/jquery.js"></script>',
-                                '<script src="../../bower_components/lodash/lodash.js"></script>',
+                                '<script src="../bower_components/jquery/jquery.js"></script>',
+                                '<script src="../bower_components/lodash/lodash.js"></script>',
                                 '<!-- endinject -->'
                             ].join('\n'));
-                        }, done);
+                        }, done, done);
                     });
                     injectorStream.write(fakeFile);
                     injectorStream.end();
@@ -303,7 +354,7 @@ describe('gulp-paths-injector', function () {
                                 message: '"bower" is reserved name for auto injecting bower ' +
                                 'dependencies, so you shouldn\'t use glob pattern with it'
                             })).to.be.true;
-                        }, done);
+                        }, done, done);
                     });
 
                     injectorStream.write(fakeFile);
@@ -324,7 +375,7 @@ describe('gulp-paths-injector', function () {
                     injectorStream.on('end', function () {
                         handleExceptions(function () {
                             expect(mainBowerFilesSpy.calledWith(mainBowerFilesOptions)).to.be.true;
-                        }, done);
+                        }, done, done);
                     });
                     injectorStream.write(fakeFile);
                     injectorStream.end();
@@ -336,15 +387,59 @@ describe('gulp-paths-injector', function () {
     });
 
     describe('.src()', function () {
+        it('Throw when templateType is not passed', function (done) {
+            var injector = pathsInjector();
+            var srcStream = injector.src();
+            var fakeFile = new File({ contents: new Buffer('<!-- inject:js (**/*.js) -->\n<!-- endinject -->') });
+            var errorSpy = sinon.spy();
 
+            srcStream.on('error', errorSpy);
+            srcStream.on('data', function () {}); //consuming data for 'end' event emitting
+            srcStream.on('end', function () {
+                handleExceptions(function () {
+                    expect(errorSpy.calledOnce).to.be.true;
+                    expect(errorSpy.calledWithMatch({ message: '"templateType" is mandatory parameter' })).to.be.true;
+                }, done, done);
+            });
+            srcStream.write(fakeFile);
+            srcStream.end();
+        });
+
+        it('Return vinyl-fs stream of files by glob', function (done) {
+            var injector = pathsInjector();
+            var srcStream = injector.src('js');
+            var fakeFile = new File({ contents: new Buffer('<!-- inject:js (**/*.js) -->\n<!-- endinject -->') });
+            var counter = 0;
+
+            srcStream.on('data', function (file) {
+                handleExceptions(function () {
+                    if (counter === 0) {
+                        expect(file.path).to.equal('files/file1.js');
+                        expect(file.contents.toString('utf8')).to.equal('data1');
+                    } else if (counter === 1) {
+                        expect(file.path).to.equal('files/file2.js');
+                        expect(file.contents.toString('utf8')).to.equal('data2');
+                        done();
+                    }
+
+                    counter++;
+
+                }, null, done);
+            });
+            srcStream.write(fakeFile);
+            srcStream.end();
+        });
     });
 });
 
-function handleExceptions(test, done) {
+function handleExceptions(test, success, error) {
     try {
         test();
-        done();
+
+        if (success) {
+            success();
+        }
     } catch (e) {
-        done(e);
+        error(e);
     }
 }
