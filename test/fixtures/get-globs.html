@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Some title</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width">
+    <meta name="fragment" content="!" />
+
+    <!-- build:css /dist/build.css -->
+        <!-- inject:css (/**/*.css) -->
+        <!-- endinject -->
+    <!-- endbuild -->
+</head>
+<body>
+<img src="/dist/image/test.png" alt="Some test image"/>
+    <!-- build:js /dist/vendors.js defer-->
+        <!-- inject:js:bower -->
+        <!-- endinject -->
+    <!-- endbuild -->
+    <!-- build:js /dist/app.js defer-->
+        <!-- inject:js:app (src/**/*.module.js) -->
+        <!-- endinject -->
+        <!-- inject:js:app (src/**/*.!(module).js) -->
+        <!-- endinject -->
+    <!-- endbuild -->
+</body>
+</html>

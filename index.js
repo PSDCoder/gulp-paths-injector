@@ -298,7 +298,7 @@ function mergeGlobsFromParams(placeholdersParams) {
     return new Promise(function (resolve, reject) {
         try {
             return resolve(placeholdersParams.reduce(function (result, placeholderParams) {
-                return result.concat(placeholderParams.files);
+                return result.concat(placeholderParams.glob);
             }, []));
         } catch (e) {
             return reject(new PluginError(PLUGIN_NAME, e.message));

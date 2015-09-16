@@ -35,14 +35,18 @@ describe('gulp-paths-injector', function () {
             src: function (filesPaths) {
                 var streamArraySource = [];
 
+                //for each glob we return two files
                 filesPaths.forEach(function (filePath) {
                     var extension = filePath.match(EXT)[1];
-                    var fileId = ++vinylCounter;
 
-                    streamArraySource.push(new File({
-                        path: 'files/file' + fileId + extension,
-                        contents: new Buffer('data of #' + fileId + ' ' + extension + ' file')
-                    }));
+                    for (var i = 0; i < 2; i++) {
+                        var fileId = ++vinylCounter;
+
+                        streamArraySource.push(new File({
+                            path: 'files/file' + fileId + extension,
+                            contents: new Buffer('data of #' + fileId + ' ' + extension + ' file')
+                        }));
+                    }
                 });
 
                 return eventStream.readArray(streamArraySource);
@@ -500,6 +504,23 @@ describe('gulp-paths-injector', function () {
                 srcStream.write(fakeFile);
                 srcStream.end();
             });
+        });
+    });
+
+    describe('.getGlobs()', function () {
+        it('Should return correct globs', function (done) {
+            var injector = pathsInjector();
+
+            injector
+                .getGlobs(path.join(__dirname, './fixtures/get-globs.html'), 'js', 'app')
+                .then(function (globs) {
+                    expect(globs).to.deep.equal([
+                        'src/**/*.module.js',
+                        'src/**/*.!(module).js'
+                    ]);
+                    done();
+                });
+
         });
     });
 });
