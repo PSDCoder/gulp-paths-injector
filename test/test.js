@@ -1,4 +1,4 @@
-/* globals describe, before, after, it */
+/* globals describe, before, after, beforeEach, afterEach, it */
 /* jshint -W030 */
 'use strict';
 
@@ -11,37 +11,41 @@ var File = require('vinyl');
 var stream = require('stream');
 var eventStream = require('event-stream');
 
-//@todo save indentation
-
 describe('gulp-paths-injector', function () {
+    var EXT = /(\.\w+)$/;
     var pathsInjector;
     var mainBowerFilesSpy;
+
+    var globCounter = 0;
+    var vinylCounter = 0;
 
     before(function () {
         mockery.enable({
             warnOnUnregistered: false
         });
         mockery.registerMock('glob', function (globPattern, opts, cb) {
-            var EXT = /(\.\w+)$/;
-            var extension = EXT.exec(globPattern)[1];
+            var extension = globPattern.match(EXT)[1];
 
             cb(null, [
-                'files/file1' + extension,
-                'files/file2' + extension
+                'files/file' + (++globCounter) + extension,
+                'files/file' + (++globCounter) + extension
             ]);
         });
         mockery.registerMock('vinyl-fs', {
-            src: function () {
-                return eventStream.readArray([
-                    new File({
-                        path: 'files/file1.js',
-                        contents: new Buffer('data1')
-                    }),
-                    new File({
-                        path: 'files/file2.js',
-                        contents: new Buffer('data2')
-                    })
-                ]);
+            src: function (filesPaths) {
+                var streamArraySource = [];
+
+                filesPaths.forEach(function (filePath) {
+                    var extension = filePath.match(EXT)[1];
+                    var fileId = ++vinylCounter;
+
+                    streamArraySource.push(new File({
+                        path: 'files/file' + fileId + extension,
+                        contents: new Buffer('data of #' + fileId + ' ' + extension + ' file')
+                    }));
+                });
+
+                return eventStream.readArray(streamArraySource);
             }
         });
 
@@ -55,6 +59,11 @@ describe('gulp-paths-injector', function () {
         mainBowerFilesSpy = sinon.spy(mainBowerFilesMock);
         mockery.registerMock('main-bower-files', mainBowerFilesSpy);
         pathsInjector = require('./../index');
+    });
+
+    afterEach(function () {
+        globCounter = 0;
+        vinylCounter = 0;
     });
 
     after(function () {
@@ -409,25 +418,88 @@ describe('gulp-paths-injector', function () {
             var injector = pathsInjector();
             var srcStream = injector.src('js');
             var fakeFile = new File({ contents: new Buffer('<!-- inject:js (**/*.js) -->\n<!-- endinject -->') });
+            var totalFilesCount = 2;
             var counter = 0;
 
             srcStream.on('data', function (file) {
                 handleExceptions(function () {
-                    if (counter === 0) {
-                        expect(file.path).to.equal('files/file1.js');
-                        expect(file.contents.toString('utf8')).to.equal('data1');
-                    } else if (counter === 1) {
-                        expect(file.path).to.equal('files/file2.js');
-                        expect(file.contents.toString('utf8')).to.equal('data2');
-                        done();
-                    }
-
                     counter++;
 
+                    if (counter < totalFilesCount) {
+                        expect(file.path).to.equal('files/file' + counter + '.js');
+                        expect(file.contents.toString('utf8')).to.equal('data of #' + counter + ' .js file');
+                    } else if (counter === totalFilesCount) {
+                        done();
+                    } else if (counter > totalFilesCount) {
+                        done('In result stream count of files bigger than should to be');
+                    }
                 }, null, done);
             });
             srcStream.write(fakeFile);
             srcStream.end();
+        });
+
+        describe('Correct filtering inject placeholders', function () {
+            it('By template type', function (done) {
+                var injector = pathsInjector();
+                var srcStream = injector.src('css');
+                var fakeFile = new File({
+                    contents: new Buffer(
+                        '<!-- inject:js (**/*.js) -->\n<!-- endinject -->\n' +
+                        '<!-- inject:css (**/*.css) -->\n<!-- endinject -->'
+                    )
+                });
+                var totalFilesCount = 2;
+                var counter = 0;
+
+                srcStream.on('data', function (file) {
+                    handleExceptions(function () {
+                        counter++;
+
+                        if (counter < totalFilesCount) {
+                            expect(file.path).to.equal('files/file' + counter + '.css');
+                            expect(file.contents.toString('utf8')).to.equal('data of #' + counter + ' .css file');
+                        } else if (counter === totalFilesCount) {
+                            done();
+                        } else if (counter > totalFilesCount) {
+                            done('In result stream count of files bigger than should to be');
+                        }
+                    }, null, done);
+                });
+                srcStream.write(fakeFile);
+                srcStream.end();
+            });
+
+            it('By name of placeholder', function (done) {
+                var injector = pathsInjector();
+                var srcStream = injector.src('js', 'app');
+                var fakeFile = new File({
+                    contents: new Buffer(
+                        '<!-- inject:js:app (**/*.js) -->\n<!-- endinject -->\n' +
+                        '<!-- inject:js:vendors (**/*.js) -->\n<!-- endinject -->\n' +
+                        '<!-- inject:js:app (**/*.js) -->\n<!-- endinject -->'
+                    )
+                });
+                var totalFilesCount = 4;
+                var counter = 0;
+
+                srcStream.on('data', function (file) {
+                    handleExceptions(function () {
+                        counter++;
+
+                        if (counter < totalFilesCount) {
+                            expect(file.path).to.equal('files/file' + counter + '.js');
+                            expect(file.contents.toString('utf8')).to.equal('data of #' + counter + ' .js file');
+                        } else if (counter === totalFilesCount) {
+                            done();
+                        } else if (counter > totalFilesCount) {
+                            done('In result stream count of files bigger than should to be');
+                        }
+                    }, null, done);
+                });
+                srcStream.write(fakeFile);
+                srcStream.end();
+            });
         });
     });
 });
