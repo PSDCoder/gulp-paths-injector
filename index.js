@@ -6,6 +6,7 @@ var glob = require('glob');
 var vinylFs = require('vinyl-fs');
 var os = require('os');
 var mainBowerFiles = require('main-bower-files');
+var fs = require('fs');
 var path = require('path');
 var url = require('url');
 var objectAssign = require('object-assign');
@@ -15,6 +16,7 @@ var PluginError = gutil.PluginError;
 var PLUGIN_NAME = 'gulp-paths-injector';
 var INJECTOR_EXPRESSION = /(^[ \t]*){0,1}(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/m;
 var defaultOptions = {
+    cwd: '',
     removePlaceholder: false,
     host: null,
     templates: {
@@ -29,7 +31,8 @@ module.exports = function (options) {
 
     return {
         inject: injectStream.bind(null, options),
-        src: srcStream.bind(null, options)
+        src: srcStream.bind(null, options),
+        getGlobs: getGlobs.bind(null, options)
     };
 };
 
@@ -56,8 +59,8 @@ function injectStream(options) {
                 .then(function (contents) {
                     file.contents = new Buffer(contents);
                     cb(null, file);
-                },
-                function (err) {
+                })
+                .catch(function (err) {
                     self.emit('error', err);
                     return cb();
                 });
@@ -98,12 +101,31 @@ function srcStream(options, templateType, name) {
                             self.emit('end');
                             cb();
                         });
-                },
-                function (err) {
+                })
+                .catch(function (err) {
                     self.emit('error', err);
                     return cb();
                 });
         }
+    });
+}
+
+function getGlobs(options, srcFile, templateType, name) {
+    return new Promise(function (resolve, reject) {
+        options.cwd = path.dirname(srcFile);
+
+        fs.readFile(srcFile, 'utf8', function (err, contents) {
+            if (err) {
+                return reject(err);
+            }
+
+            extractPlaceholders(contents)
+                .then(resolveGlobs.bind(null, options))
+                .then(filterPlaceholders.bind(null, templateType, name))
+                .then(mergeGlobsFromParams)
+                .then(resolve)
+                .catch(reject);
+        });
     });
 }
 
@@ -260,7 +282,7 @@ function filterPlaceholders(templateType, name, placeholdersParams) {
                     result = false;
                 }
 
-                if (name && placeholderParams.name !== name) {
+                if (name !== undefined && placeholderParams.name !== name) {
                     result = false;
                 }
 
