@@ -12,80 +12,17 @@ Install with [npm](https://npmjs.org/package/gulp-paths-injector)
 npm install gulp-paths-injector --save-dev
 ```
 
-# Simple usage
+# Usage examples
 
-```html
-    <!doctype html>
-    <html>
-    <head>
-        <!-- inject:css (assets/**/*.css) -->
-    
-        <!-- endinject -->
-    </head>
-    <body>
-        <!-- with bower you don't need use glob -->
-        <!-- inject:js:bower -->
-    
-        <!-- endinject -->
-    
-        <!-- inject:js (src/**/*.module.js) -->
-    
-        <!-- endinject -->
-        <!-- inject:js (src/**/*.!(module).js) -->
-    
-        <!-- endinject -->
-    </body>
-    </html>
-```
-
-this template may be handled with this gulp config:
-
-
-```js
-    var pathsInjector = require('gulp-paths-injector');
-    var plumber = require('gulp-plumber');
-       
-    gulp.task('inject', function () {
-        var injector = pathsInjector({ host: 'http://somecdn.net' });
-
-        gulp.src('index.html')
-            .pipe(plumber())
-            .pipe(injector.inject())
-            .pipe(gulp.dest('./index-injected.html'));
-    });
-```
-
-and in index-injected.html you can find injected dependencies paths:
-
-```html
-    <!doctype html>
-    <html>
-    <head>
-        <!-- inject:css (assets/**/*.css) -->
-        <link rel="stylesheet" href="assets/styles/test.css">
-        <link rel="stylesheet" href="assets/styles/test2.css">
-        <!-- endinject -->
-    </head>
-    <body>
-        <!-- inject:js:bower -->
-        <script src="bower_components/angular/angular.js"></script>
-        <script src="bower_components/jquery/dist/jquery.js"></script>
-        <script src="bower_components/lodash/lodash.js"></script>
-        <!-- endinject -->
-    
-        <!-- inject:js (src/**/*.module.js) -->
-        <script src="/src/appName/hitrock.module.js"></script>
-        <!-- endinject -->
-        <!-- inject:js (src/**/*.!(module).js) -->
-        <script src="/src/appName/services/some.service.js"></script>
-        <!-- endinject -->
-    </body>
-    </html>
-```
+* [Injecting paths to template](/docs/inject.md)
+* [Get files by globs in inject placeholders](/docs/src.md)
+* [Get globs list from template](/docs/getGlobs.md)
 
 # API
 
 ## injector(options)
+
+Returns instance of injector.
 
 ### options.cwd
 
@@ -130,9 +67,18 @@ If you want pass custom options to main-bower-files plugin you can use this opti
 
 ## injector.inject()
 
-Type: `Stream`
-
+Return type: `Stream`  
 Resolve all injections in passed template and return handled template.
+
+## injector.src(templateType, name)
+
+Return type: `Stream`  
+Returns stream of files matched to globs filtered by passed `templateType` and `name` params
+
+## injector.getGlobs(pathToTemplate, templateType, name)
+
+Return type: `Promise`  
+
 
 # Contributing
 

@@ -17,6 +17,7 @@
     "inject",
     "injector",
     "include",
+    "bower",
     "glob",
     "script",
     "link"
