@@ -15,6 +15,7 @@ var PluginError = gutil.PluginError;
 
 var PLUGIN_NAME = 'gulp-paths-injector';
 var INJECTOR_EXPRESSION = /(^[ \t]*){0,1}(<!--\s*inject:(\w+)(?::(\w+))?(?:\s*\((.+)\))?\s*-->)(?:.|\n)*?(<!--\s*endinject\s*-->)/m;
+var IS_JS_FILE = /\.js$/;
 var defaultOptions = {
     cwd: '',
     removePlaceholder: false,
@@ -25,6 +26,7 @@ var defaultOptions = {
     },
     mainBowerFiles: {}
 };
+var IS_JS_FILE = /\.js$/;
 
 module.exports = function (options) {
     options = objectAssign({}, defaultOptions, options) || {};
@@ -186,9 +188,19 @@ function resolveGlobs(options, placeholdersParams) {
                             'bower dependencies, so you shouldn\'t use glob pattern with it'));
                     }
 
-                    placeholderParams.files = mainBowerFiles(options.mainBowerFiles).map(function (filePath) {
-                        return path.relative(options.cwd, filePath);
-                    });
+                    var tempFiles = [];
+
+                    mainBowerFiles(options.mainBowerFiles)
+                        .map(function (filePath) {
+                            return path.relative(options.cwd, filePath);
+                        })
+                        .forEach(function (filePath) {
+                            if (IS_JS_FILE.test(filePath)) {
+                                tempFiles.push(filePath);
+                            }
+                        });
+
+                    placeholderParams.files = tempFiles;
 
                     return resolve(placeholderParams);
                 } else {
